@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador Operacional - Leapmotor C10 REEV</title>
+    <!-- Carregando Tailwind CSS para estilização responsiva e moderna -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Fonte Inter para leitura limpa -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Ícones Phosphor para visual automotivo e financeiro -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #090d16;
+            color: #f8fafc;
+        }
+        /* Estilização customizada para sliders (range inputs) */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #10b981;
+            cursor: pointer;
+            margin-top: -7px;
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+            border: 2px solid #ffffff;
+            transition: transform 0.15s ease;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: #1e293b;
+            border-radius: 999px;
+        }
+        /* Variação de cor para slider de gasolina/extensor */
+        input[type=range].amber-slider::-webkit-slider-thumb {
+            background: #f59e0b;
+            box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
+        }
+        /* Variação de cor para slider de custos fixos/reserva */
+        input[type=range].blue-slider::-webkit-slider-thumb {
+            background: #3b82f6;
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+        }
+        .glass-card {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(51, 65, 85, 0.5);
+        }
+    </style>
+</head>
+<body class="antialiased min-h-screen pb-12 selection:bg-emerald-500 selection:text-white">
+
+    <!-- Cabeçalho Hero com Identidade do Veículo -->
+    <header class="border-b border-slate-800 bg-slate-900/90 sticky top-0 z-30 backdrop-blur-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center shadow-lg shadow-emerald-900/40">
+                    <i class="ph-fill ph-lightning text-white text-xl"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-lg sm:text-xl font-bold tracking-tight text-white">Leapmotor C10 REEV</h1>
+                        <span class="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full">Uber Black</span>
+                    </div>
+                    <p class="text-xs text-slate-400">Modelagem Financeira • Elétrico de Autonomia Estendida (REEV)</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3 w-full sm:w-auto justify-end">
+                <button onclick="resetDefaults()" class="px-3.5 py-2 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl transition flex items-center gap-1.5">
+                    <i class="ph ph-arrow-counter-clockwise text-sm"></i>
+                    Restaurar Padrão
+                </button>
+                <button onclick="copySummary()" class="px-4 py-2 text-xs font-semibold text-slate-950 bg-emerald-400 hover:bg-emerald-300 rounded-xl transition flex items-center gap-1.5 shadow-lg shadow-emerald-500/20">
+                    <i class="ph-bold ph-copy text-sm"></i>
+                    Copiar Resumo
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Notificação Toast -->
+    <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+        <div class="bg-emerald-500 text-slate-950 font-semibold px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2 text-sm">
+            <i class="ph-fill ph-check-circle text-lg"></i>
+            <span id="toast-msg">Resumo copiado para a área de transferência!</span>
+        </div>
+    </div>
+
+    <!-- Conteúdo Principal -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
+
+        <!-- Banner Superior: Cartão do Veículo & Resumo Rápido de Break-Even -->
+        <div class="glass-card rounded-2xl p-5 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-center relative overflow-hidden">
+            <div class="lg:col-span-4 flex flex-col sm:flex-row lg:flex-col items-center sm:items-start gap-4">
+                <div class="relative w-full h-36 sm:w-48 lg:w-full sm:h-32 lg:h-40 rounded-xl overflow-hidden border border-slate-700/80 bg-slate-800 shrink-0">
+                    <div class="w-full h-full bg-gradient-to-br from-slate-800 via-slate-900 to-emerald-950 flex flex-col items-center justify-center p-4 text-center">
+                        <!-- Silhueta fiel do Leapmotor C10 (SUV cupê limpo, módulo LiDAR no topo, barra LED frontal e rodas raiadas) -->
+                        <svg class="w-40 h-16 text-emerald-400 drop-shadow-[0_4px_12px_rgba(16,185,129,0.3)]" viewBox="0 0 260 95" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <!-- Módulo LiDAR característico no teto do C10 -->
+                            <path d="M98 16C100 12.5 106 12.5 109 16H98Z" fill="#6ee7b7"/>
+                            <!-- Carroceria SUV limpa e aerodinâmica -->
+                            <path d="M24 62C18 62 15 58 15 52V44C15 38 20 34 30 32L66 26C82 17 104 15 142 15C176 15 202 20 222 31L237 35C243 37 246 42 246 49V55C246 59 243 62 238 62H216C216 49 206 39 193 39C180 39 170 49 170 62H88C88 49 78 39 65 39C52 39 42 49 42 62H24Z" fill="currentColor" fill-opacity="0.18" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/>
+                            <!-- Área envidraçada contínua -->
+                            <path d="M74 28L91 19H168L192 29H74Z" fill="currentColor" fill-opacity="0.32"/>
+                            <line x1="128" y1="19" x2="128" y2="29" stroke="#0f172a" stroke-width="2"/>
+                            <!-- Maçanetas retráteis embutidas -->
+                            <line x1="106" y1="38" x2="117" y2="38" stroke="#6ee7b7" stroke-width="1.8" stroke-linecap="round"/>
+                            <line x1="152" y1="38" x2="163" y2="38" stroke="#6ee7b7" stroke-width="1.8" stroke-linecap="round"/>
+                            <!-- Farol frontal LED contínuo e lanterna traseira -->
+                            <path d="M18 40H38" stroke="#a7f3d0" stroke-width="2.5" stroke-linecap="round"/>
+                            <path d="M234 38H244" stroke="#34d399" stroke-width="2.5" stroke-linecap="round"/>
+                            <!-- Rodas aro 20 -->
+                            <circle cx="65" cy="62" r="16" fill="#0f172a" stroke="currentColor" stroke-width="2.8"/>
+                            <circle cx="65" cy="62" r="7" stroke="#6ee7b7" stroke-width="1.5"/>
+                            <circle cx="193" cy="62" r="16" fill="#0f172a" stroke="currentColor" stroke-width="2.8"/>
+                            <circle cx="193" cy="62" r="7" stroke="#6ee7b7" stroke-width="1.5"/>
+                        </svg>
+                        <span class="text-xs font-semibold text-slate-200 mt-1">Leapmotor C10 REEV • Bateria 28 kWh</span>
+                        <span class="text-[11px] text-emerald-400">Autonomia Pura ~149 km + Extensor a Gasolina</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Indicadores Principais (KPIs) -->
+            <div class="lg:col-span-8 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                <!-- KPI 1: Lucro Líquido -->
+                <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between">
+                    <div class="flex items-center justify-between text-slate-400 text-xs font-medium mb-1">
+                        <span>Lucro Livre / Mês</span>
+                        <i class="ph-fill ph-wallet text-emerald-400 text-base"></i>
+                    </div>
+                    <div>
+                        <div id="kpi-lucro" class="text-xl sm:text-2xl font-extrabold text-emerald-400 tracking-tight">R$ 4.679,35</div>
+                        <div id="kpi-lucro-dia" class="text-[11px] text-slate-400 mt-1">R$ 212,70 / dia trabalhado</div>
+                    </div>
+                </div>
+
+                <!-- KPI 2: Custo Total por KM -->
+                <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between">
+                    <div class="flex items-center justify-between text-slate-400 text-xs font-medium mb-1">
+                        <span>Custo Total / km</span>
+                        <i class="ph-fill ph-gauge text-blue-400 text-base"></i>
+                    </div>
+                    <div>
+                        <div id="kpi-custo-km" class="text-xl sm:text-2xl font-extrabold text-white tracking-tight">R$ 2,48</div>
+                        <div id="kpi-variavel-km" class="text-[11px] text-slate-400 mt-1">Variável: R$ 0,45/km</div>
+                    </div>
+                </div>
+
+                <!-- KPI 3: Margem Líquida por KM -->
+                <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between">
+                    <div class="flex items-center justify-between text-slate-400 text-xs font-medium mb-1">
+                        <span>Margem / km</span>
+                        <i class="ph-fill ph-trend-up text-teal-400 text-base"></i>
+                    </div>
+                    <div>
+                        <div id="kpi-margem-km" class="text-xl sm:text-2xl font-extrabold text-teal-300 tracking-tight">R$ 1,52</div>
+                        <div id="kpi-margem-pct" class="text-[11px] text-slate-400 mt-1">38,0% da receita bruta</div>
+                    </div>
+                </div>
+
+                <!-- KPI 4: Ponto de Equilíbrio (Break-Even) -->
+                <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between">
+                    <div class="flex items-center justify-between text-slate-400 text-xs font-medium mb-1">
+                        <span>Ponto de Equilíbrio</span>
+                        <i class="ph-fill ph-flag-checkered text-amber-400 text-base"></i>
+                    </div>
+                    <div>
+                        <div id="kpi-breakeven-km" class="text-xl sm:text-2xl font-extrabold text-amber-400 tracking-tight">1.761 km</div>
+                        <div id="kpi-breakeven-dias" class="text-[11px] text-slate-400 mt-1">~12,6 dias p/ pagar tudo</div>
+                    </div>
+                </div>
+
+                <!-- Barra Visual de Composição do Faturamento Bruto -->
+                <div class="col-span-2 sm:col-span-4 bg-slate-900/60 border border-slate-800/80 rounded-xl p-3.5 mt-1">
+                    <div class="flex flex-wrap items-center justify-between text-xs mb-2 gap-2">
+                        <span class="font-semibold text-slate-300">Destino do Faturamento Bruto (<span id="bar-faturamento-total" class="text-white font-bold">R$ 12.320,00</span>)</span>
+                        <div class="flex flex-wrap items-center gap-3 text-[11px]">
+                            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-slate-500"></span> Fixos (<span id="pct-fixo">42.6%</span>)</span>
+                            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span> Reserva (<span id="pct-reserva">8.1%</span>)</span>
+                            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Rodagem (<span id="pct-var">11.3%</span>)</span>
+                            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Lucro (<span id="pct-lucro">38.0%</span>)</span>
+                        </div>
+                    </div>
+                    <div class="w-full h-3.5 bg-slate-800 rounded-full overflow-hidden flex">
+                        <div id="prog-fixo" class="bg-slate-500 h-full transition-all duration-300" style="width: 42.6%"></div>
+                        <div id="prog-reserva" class="bg-blue-500 h-full transition-all duration-300" style="width: 8.1%"></div>
+                        <div id="prog-var" class="bg-amber-500 h-full transition-all duration-300" style="width: 11.3%"></div>
+                        <div id="prog-lucro" class="bg-emerald-500 h-full transition-all duration-300" style="width: 38.0%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Grid de Controles Interativos (Sliders) + Detalhamento -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- Coluna da Esquerda: Controles Deslizantes (7 colunas) -->
+            <div class="lg:col-span-7 space-y-6">
+                
+                <!-- Bloco 1: Operação Diária & Extensor de Range (REEV) -->
+                <section class="glass-card rounded-2xl p-5 sm:p-6 space-y-5">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div class="flex items-center gap-2.5">
+                            <div class="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
+                                <i class="ph-fill ph-road-horizon text-lg"></i>
+                            </div>
+                            <div>
+                                <h2 class="text-base font-bold text-white">1. Rotina de Rodagem & Modo REEV</h2>
+                                <p class="text-xs text-slate-400">Ajuste quanto você roda na bateria e quanto estende na gasolina</p>
+                            </div>
+                        </div>
+                        <span id="badge-km-mes" class="px-3 py-1 rounded-full bg-slate-800 text-emerald-400 font-bold text-xs border border-slate-700">
+                            3.080 km/mês
+                        </span>
+                    </div>
+
+                    <!-- Slider: KM Diário Total -->
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center">
+                            <label for="slider-km-dia" class="text-sm font-medium text-slate-200">Quilometragem Diária Total</label>
+                            <span id="val-km-dia" class="text-sm font-bold text-emerald-400 bg-emerald-950/60 px-2.5 py-0.5 rounded-lg border border-emerald-800/50">140 km/dia</span>
+                        </div>
+                        <input type="range" id="slider-km-dia" min="40" max="350" step="5" value="140">
+                        <div class="flex justify-between text-[11px] text-slate-400">
+                            <span>40 km (Turno curto)</span>
+                            <span class="text-emerald-400/90 font-medium">Limite bateria pura: <span id="label-limite-bat">149 km</span></span>
+                            <span>350 km (Turno estendido)</span>
+                        </div>
+                    </div>
+
+                    <!-- Indicador Inteligente de Modo Elétrico vs Gasolina -->
+                    <div id="reev-status-box" class="rounded-xl p-3.5 bg-emerald-950/30 border border-emerald-800/40 flex items-start gap-3 transition-colors">
+                        <i id="reev-icon" class="ph-fill ph-battery-charging text-emerald-400 text-xl mt-0.5"></i>
+                        <div class="text-xs space-y-1 flex-1">
+                            <div id="reev-title" class="font-bold text-emerald-300">Operação 100% Elétrica no Dia</div>
+                            <p id="reev-desc" class="text-slate-300 leading-relaxed">
+                                Você está rodando <strong>140 km/dia</strong> na bateria (custo de R$ 0,26/km) e não precisa acionar o motor a combustão.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Grid com 2 Sliders menores: Dias/Mês e Tarifa por KM -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-2">
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-center">
+                                <label for="slider-dias" class="text-sm font-medium text-slate-200">Dias Trabalhados / Mês</label>
+                                <span id="val-dias" class="text-sm font-bold text-white bg-slate-800 px-2.5 py-0.5 rounded-lg">22 dias</span>
+                            </div>
+                            <input type="range" id="slider-dias" min="10" max="30" step="1" value="22">
+                            <div class="flex justify-between text-[11px] text-slate-500">
+                                <span>10 dias</span>
+                                <span>22 dias (Seg-Sex)</span>
+                                <span>30 dias</span>
+                            </div>
+                        </div>
+
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-center">
+                                <label for="slider-receita-km" class="text-sm font-medium text-slate-200">Ganho Líquido / km (Uber)</label>
+                                <span id="val-receita-km" class="text-sm font-bold text-emerald-400 bg-slate-800 px-2.5 py-0.5 rounded-lg">R$ 4,00/km</span>
+                            </div>
+                            <input type="range" id="slider-receita-km" min="2.00" max="7.00" step="0.10" value="4.00">
+                            <div class="flex justify-between text-[11px] text-slate-500">
+                                <span>R$ 2,00</span>
+                                <span>R$ 4,00 (Ref.)</span>
+                                <span>R$ 7,00</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Bloco 2: Custos Fixos & Reserva Patrimonial -->
+                <section class="glass-card rounded-2xl p-5 sm:p-6 space-y-5">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div class="flex items-center gap-2.5">
+                            <div class="p-2 rounded-lg bg-blue-500/10 text-blue-400">
+                                <i class="ph-fill ph-bank text-lg"></i>
+                            </div>
+                            <div>
+                                <h2 class="text-base font-bold text-white">2. Custos Fixos & Reserva do Carro</h2>
+                                <p class="text-xs text-slate-400">Parcela, seguro e quanto você quer guardar por mês</p>
+                            </div>
+                        </div>
+                        <span id="badge-fixo-total" class="px-3 py-1 rounded-full bg-slate-800 text-blue-400 font-bold text-xs border border-slate-700">
+                            R$ 6.250,00/mês
+                        </span>
+                    </div>
+
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center">
+                            <label for="slider-parcela" class="text-sm font-medium text-slate-200">Prestação do Financiamento</label>
+                            <span id="val-parcela" class="text-sm font-bold text-white bg-slate-800 px-2.5 py-0.5 rounded-lg">R$ 4.500,00</span>
+                        </div>
+                        <input type="range" id="slider-parcela" class="blue-slider" min="0" max="8000" step="100" value="4500">
+                        <div class="flex justify-between text-[11px] text-slate-500">
+                            <span>R$ 0 (Quitado)</span>
+                            <span>R$ 4.500</span>
+                            <span>R$ 8.000</span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-center">
+                                <label for="slider-seguro" class="text-sm font-medium text-slate-200">Seguro Anual</label>
+                                <span id="val-seguro" class="text-sm font-bold text-white bg-slate-800 px-2.5 py-0.5 rounded-lg">R$ 9.000/ano</span>
+                            </div>
+                            <input type="range" id="slider-seguro" class="blue-slider" min="3000" max="18000" step="300" value="9000">
+                            <div class="flex justify-between text-[11px] text-slate-400">
+                                <span>Equivale a <strong id="val-seguro-mes" class="text-slate-200">R$ 750,00/mês</strong></span>
+                            </div>
+                        </div>
+
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-center">
+                                <label for="slider-reserva" class="text-sm font-medium text-blue-300">Guardar Reserva / Mês</label>
+                                <span id="val-reserva" class="text-sm font-bold text-blue-400 bg-blue-950/60 px-2.5 py-0.5 rounded-lg border border-blue-800/50">R$ 1.000,00</span>
+                            </div>
+                            <input type="range" id="slider-reserva" class="blue-slider" min="0" max="3000" step="100" value="1000">
+                            <div class="flex justify-between text-[11px] text-blue-300/80">
+                                <span>Acumula <strong id="val-reserva-ano">R$ 12.000,00</strong> em 12 meses</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Bloco 3: Parâmetros Técnicos de Energia, Gasolina e Manutenção -->
+                <section class="glass-card rounded-2xl p-5 sm:p-6 space-y-5">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div class="flex items-center gap-2.5">
+                            <div class="p-2 rounded-lg bg-amber-500/10 text-amber-400">
+                                <i class="ph-fill ph-sliders text-lg"></i>
+                            </div>
+                            <div>
+                                <h2 class="text-base font-bold text-white">3. Parâmetros de Energia, Gasolina & Manutenção</h2>
+                                <p class="text-xs text-slate-400">Ajuste tarifas de recarga, preço da gasolina no modo extensor e revisões</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                        <!-- Preço do kWh -->
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-center">
+                                <label for="slider-kwh" class="text-sm font-medium text-slate-200">Tarifa Energia (R$/kWh)</label>
+                                <span id="val-kwh" class="text-sm font-bold text-emerald-400 bg-slate-800 px-2.5 py-0.5 rounded-lg">R$ 1,50/kWh</span>
+                            </div>
+                            <input type="range" id="slider-kwh" min="0.60" max="3.50" step="0.05" value="1.50">
+                            <div class="flex justify-between text-[11px] text-slate-400">
+                                <span>Residencial (~R$ 0,85)</span>
+                                <span>Eletroposto (~R$ 2,20)</span>
+                            </div>
+                        </div>
+
+                        <!-- Autonomia real na bateria -->
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-center">
+                                <label for="slider-autonomia" class="text-sm font-medium text-slate-200">Autonomia Elétrica (91% bat.)</label>
+                                <span id="val-autonomia" class="text-sm font-bold text-emerald-400 bg-slate-800 px-2.5 py-0.5 rounded-lg">149 km</span>
+                            </div>
+                            <input type="range" id="slider-autonomia" min="100" max="180" step="1" value="149">
+                            <div class="flex justify-between text-[11px] text-slate-400">
+                                <span>Uso intenso: 110 km</span>
+                                <span>Obs.: 149 km (25,48 kWh)</span>
+                            </div>
+                        </div>
+
+                        <!-- Preço da Gasolina (Modo Extensor) -->
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-center">
+                                <label for="slider-gasolina" class="text-sm font-medium text-amber-300">Preço Gasolina (Modo REEV)</label>
+                                <span id="val-gasolina" class="text-sm font-bold text-amber-400 bg-slate-800 px-2.5 py-0.5 rounded-lg">R$ 6,10/L</span>
+                            </div>
+                            <input type="range" id="slider-gasolina" class="amber-slider" min="4.50" max="8.00" step="0.10" value="6.10">
+                            <div class="flex justify-between text-[11px] text-slate-400">
+                                <span>Usado apenas acima de <span id="span-bat-limit">149</span> km/dia</span>
+                            </div>
+                        </div>
+
+                        <!-- Consumo no modo extensor (km/L) -->
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-center">
+                                <label for="slider-kml" class="text-sm font-medium text-amber-300">Eficiência Gerador (km/L)</label>
+                                <span id="val-kml" class="text-sm font-bold text-amber-400 bg-slate-800 px-2.5 py-0.5 rounded-lg">14,5 km/L</span>
+                            </div>
+                            <input type="range" id="slider-kml" class="amber-slider" min="10.0" max="20.0" step="0.5" value="14.5">
+                            <div class="flex justify-between text-[11px] text-slate-400">
+                                <span>Custo km na gasolina: <strong id="val-custo-gas-km" class="text-amber-300">R$ 0,42/km</strong></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Seção de Revisões Alternadas (Ciclo de 20.000 km) + Pneus -->
+                    <div class="pt-4 border-t border-slate-800/80 space-y-4">
+                        <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-4 space-y-4">
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <div>
+                                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center gap-1.5">
+                                        <i class="ph-fill ph-wrench text-amber-400"></i>
+                                        Ciclo de Revisões Alternadas (a cada 20.000 km)
+                                    </h3>
+                                    <p class="text-[11px] text-slate-400 mt-0.5">
+                                        Soma a revisão básica (10 mil km) + completa (20 mil km) e divide por 20.000 km
+                                    </p>
+                                </div>
+                                <span id="badge-revisao-media" class="px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold shrink-0">
+                                    Média: R$ 0,110/km
+                                </span>
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <!-- Revisão Básica (10.000 km) -->
+                                <div class="space-y-1.5">
+                                    <div class="flex justify-between items-center">
+                    <!-- Seção de Revisão Tabelada Fixa + Pneus -->
+                    <div class="pt-4 border-t border-slate-800/80 space-y-4">
+                        <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div class="flex items-start gap-2.5">
+                                <div class="p-2 rounded-lg bg-amber-500/10 text-amber-400 shrink-0 mt-0.5">
+                                    <i class="ph-fill ph-wrench text-base"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-200">
+                                        Revisão Tabelada Leapmotor C10 (Fixa)
+                                    </h3>
+                                    <p class="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                                        Ciclo alternado de <strong class="text-slate-300">R$ 500</strong> (10/30 mil km) e <strong class="text-slate-300">R$ 1.700</strong> (20/40 mil km) = <strong class="text-slate-200">R$ 4.400,00</strong> a cada 40.000 km.
+                                    </p>
+                                </div>
+                            </div>
+                            <span class="px-3 py-1.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold shrink-0 self-start sm:self-center">
+                                Fixo: R$ 0,110/km
+                            </span>
+                        </div>
+
+                        <!-- Pneus -->
+                        <div class="space-y-2 px-1">
+                            <div class="flex justify-between items-center">
+                                <label for="slider-pneus" class="text-xs font-medium text-slate-300">Jogo 4 Pneus (durabilidade estimada de 40.000 km)</label>
+                                <span id="val-pneus" class="text-xs font-bold text-slate-200 bg-slate-800 px-2 py-0.5 rounded">R$ 3.400 (R$ 0,085/km)</span>
+                            </div>
+                            <input type="range" id="slider-pneus" min="2000" max="6000" step="100" value="3400">
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Coluna da Direita: Demonstrativo Financeiro Detalhado (5 colunas) -->
+            <div class="lg:col-span-5 space-y-6">
+                
+                <!-- Extrato Mensal Completo -->
+                <div class="glass-card rounded-2xl p-5 sm:p-6 space-y-5 sticky top-24">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <h3 class="text-base font-bold text-white flex items-center gap-2">
+                            <i class="ph-fill ph-receipt text-emerald-400"></i>
+                            Demonstrativo Mensal
+                        </h3>
+                        <span class="text-xs text-slate-400" id="resumo-km-total">3.080 km/mês</span>
+                    </div>
+
+                    <!-- Receita Bruta -->
+                    <div class="bg-emerald-950/25 border border-emerald-800/30 rounded-xl p-4 flex items-center justify-between">
+                        <div>
+                            <div class="text-xs text-emerald-300/80 font-medium">Faturamento Bruto Mensal</div>
+                            <div class="text-[11px] text-slate-400 mt-0.5" id="detalhe-faturamento-diario">R$ 560,00/dia × 22 dias</div>
+                        </div>
+                        <div class="text-xl font-extrabold text-emerald-400" id="ext-faturamento">R$ 12.320,00</div>
+                    </div>
+
+                    <!-- Grupo: Custos Fixos -->
+                    <div class="space-y-2.5">
+                        <div class="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-400">
+                            <span>Custos Fixos & Reserva</span>
+                            <span id="ext-total-fixo" class="text-slate-200">R$ 6.250,00</span>
+                        </div>
+                        <div class="bg-slate-900/70 rounded-xl p-3.5 space-y-2 text-sm border border-slate-800/80">
+                            <div class="flex justify-between text-slate-300">
+                                <span>Prestação Financiamento</span>
+                                <span class="font-medium" id="ext-parcela">R$ 4.500,00</span>
+                            </div>
+                            <div class="flex justify-between text-slate-300">
+                                <span>Seguro Mensal (1/12)</span>
+                                <span class="font-medium" id="ext-seguro">R$ 750,00</span>
+                            </div>
+                            <div class="flex justify-between text-blue-300">
+                                <span class="flex items-center gap-1.5">
+                                    <i class="ph-fill ph-piggy-bank"></i>
+                                    Reserva Patrimonial (Franquia)
+                                </span>
+                                <span class="font-semibold" id="ext-reserva">R$ 1.000,00</span>
+                            </div>
+                            <div class="pt-2 border-t border-slate-800 flex justify-between text-xs text-slate-400">
+                                <span>Peso do Custo Fixo por km rodado:</span>
+                                <span class="font-semibold text-slate-200" id="ext-fixo-por-km">R$ 2,03/km</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Grupo: Custos Variáveis -->
+                    <div class="space-y-2.5">
+                        <div class="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-400">
+                            <span>Custos Variáveis de Rodagem</span>
+                            <span id="ext-total-variavel" class="text-amber-400">R$ 1.390,65</span>
+                        </div>
+                        <div class="bg-slate-900/70 rounded-xl p-3.5 space-y-2 text-sm border border-slate-800/80">
+                            <div class="flex justify-between text-slate-300">
+                                <div>
+                                    <span>Energia Elétrica</span>
+                                    <span class="block text-[11px] text-slate-500" id="ext-km-eletrico-info">3.080 km (R$ 0,257/km)</span>
+                                </div>
+                                <span class="font-medium text-emerald-300" id="ext-energia">R$ 790,05</span>
+                            </div>
+                            <div class="flex justify-between text-slate-300" id="row-gasolina">
+                                <div>
+                                    <span>Gasolina (Modo Extensor)</span>
+                                    <span class="block text-[11px] text-slate-500" id="ext-km-gas-info">0 km/mês (não utilizado)</span>
+                                </div>
+                                <span class="font-medium text-amber-300" id="ext-gasolina">R$ 0,00</span>
+                            </div>
+                            <div class="flex justify-between text-slate-300">
+                                <span>Provisão Pneus (<span id="ext-pneu-km">R$ 0,085</span>/km)</span>
+                                <span class="font-medium" id="ext-pneus">R$ 261,80</span>
+                            </div>
+                            <div class="flex justify-between text-slate-300">
+                                <span>Provisão Revisões (<span id="ext-rev-km">R$ 0,110</span>/km)</span>
+                                <span class="font-medium" id="ext-revisoes">R$ 338,80</span>
+                            </div>
+                            <div class="pt-2 border-t border-slate-800 flex justify-between text-xs text-slate-400">
+                                <span>Custo Variável Médio por km:</span>
+                                <span class="font-semibold text-amber-400" id="ext-var-por-km">R$ 0,45/km</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Total de Saídas e Resultado Final -->
+                    <div class="pt-2 space-y-3">
+                        <div class="flex justify-between items-center text-sm px-1">
+                            <span class="text-slate-400">Custo Total Provisionado (Fixo + Var.):</span>
+                            <span class="font-bold text-white" id="ext-custo-total">R$ 7.640,65</span>
+                        </div>
+
+                        <div id="box-resultado-final" class="rounded-2xl p-4 bg-gradient-to-r from-emerald-600/20 to-teal-600/20 border border-emerald-500/40 space-y-2">
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm font-bold text-white">Lucro Líquido Livre</span>
+                                <span class="text-2xl font-black text-emerald-400" id="ext-lucro-final">R$ 4.679,35</span>
+                            </div>
+                            <div class="flex justify-between items-center text-xs text-blue-300 pt-1 border-t border-emerald-500/20">
+                                <span>Lucro Livre + Reserva Guardada (Patrimônio):</span>
+                                <span class="font-bold" id="ext-lucro-mais-reserva">R$ 5.679,35</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Nota de Transparência -->
+                    <div class="text-[11px] text-slate-400 bg-slate-900/50 p-3 rounded-xl border border-slate-800/60 leading-relaxed">
+                        <strong class="text-slate-300">Nota do Modelo:</strong> O valor por km informado (R$ 4,00/km) considera o repasse líquido do aplicativo. Impostos (MEI/Simples), lavagens e depreciação não estão deduzidos neste cálculo.
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        const formatBRL = (value) => {
+            return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        };
+
+        const formatBRL3 = (value) => {
+            return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 3, maximumFractionDigits: 3 });
+        };
+
+        const sliders = {
+            kmDia: document.getElementById('slider-km-dia'),
+            dias: document.getElementById('slider-dias'),
+            receitaKm: document.getElementById('slider-receita-km'),
+            parcela: document.getElementById('slider-parcela'),
+            seguro: document.getElementById('slider-seguro'),
+            reserva: document.getElementById('slider-reserva'),
+            kwh: document.getElementById('slider-kwh'),
+            autonomia: document.getElementById('slider-autonomia'),
+            gasolina: document.getElementById('slider-gasolina'),
+            kml: document.getElementById('slider-kml'),
+            pneus: document.getElementById('slider-pneus')
+        };
+
+        const defaults = {
+            kmDia: 140,
+            dias: 22,
+            receitaKm: 4.00,
+            parcela: 4500,
+            seguro: 9000,
+            reserva: 1000,
+            kwh: 1.50,
+            autonomia: 149,
+            gasolina: 6.10,
+            kml: 14.5,
+            pneus: 3400
+        };
+
+        const ENERGIA_CICLO_KWH = 28 * 0.91; // 25.48 kWh
+        const CUSTO_KM_REVISAO_FIXO = 4400 / 40000; // R$ 0,11/km tabelado
+
+        function calculate() {
+            const kmDia = parseFloat(sliders.kmDia.value);
+            const dias = parseInt(sliders.dias.value);
+            const receitaKm = parseFloat(sliders.receitaKm.value);
+
+            const parcela = parseFloat(sliders.parcela.value);
+            const seguroAnual = parseFloat(sliders.seguro.value);
+            const seguroMes = seguroAnual / 12;
+            const reservaMes = parseFloat(sliders.reserva.value);
+
+            const precoKwh = parseFloat(sliders.kwh.value);
+            const autonomiaEletrica = parseFloat(sliders.autonomia.value);
+            const precoGasolina = parseFloat(sliders.gasolina.value);
+            const eficienciaKml = parseFloat(sliders.kml.value);
+
+            const jogoPneus = parseFloat(sliders.pneus.value);
+
+            // Quilometragem
+            const kmMensalTotal = kmDia * dias;
+            const kmEletricoDia = Math.min(kmDia, autonomiaEletrica);
+            const kmGasolinaDia = Math.max(0, kmDia - autonomiaEletrica);
+
+            const kmEletricoMes = kmEletricoDia * dias;
+            const kmGasolinaMes = kmGasolinaDia * dias;
+
+            // Custos unitários por km
+            const custoCicloEnergia = ENERGIA_CICLO_KWH * precoKwh;
+            const custoKmEletrico = custoCicloEnergia / autonomiaEletrica;
+            const custoKmGasolina = precoGasolina / eficienciaKml;
+            const custoKmPneus = jogoPneus / 40000;
+            const custoKmRevisao = CUSTO_KM_REVISAO_FIXO;
+
+            // Custos variáveis mensais
+            const gastoEnergiaMes = kmEletricoMes * custoKmEletrico;
+            const gastoGasolinaMes = kmGasolinaMes * custoKmGasolina;
+            const gastoPneusMes = kmMensalTotal * custoKmPneus;
+            const gastoRevisaoMes = kmMensalTotal * custoKmRevisao;
+
+            const custoVariavelTotalMes = gastoEnergiaMes + gastoGasolinaMes + gastoPneusMes + gastoRevisaoMes;
+            const custoVariavelMedioKm = kmMensalTotal > 0 ? (custoVariavelTotalMes / kmMensalTotal) : 0;
+
+            // Custos fixos mensais
+            const custoFixoTotalMes = parcela + seguroMes + reservaMes;
+            const custoFixoPorKm = kmMensalTotal > 0 ? (custoFixoTotalMes / kmMensalTotal) : 0;
+
+            // Totais, faturamento e lucro
+            const faturamentoDia = kmDia * receitaKm;
+            const faturamentoMes = kmMensalTotal * receitaKm;
+            const custoTotalMes = custoFixoTotalMes + custoVariavelTotalMes;
+            const lucroLiquidoMes = faturamentoMes - custoTotalMes;
+            const lucroPorDia = dias > 0 ? (lucroLiquidoMes / dias) : 0;
+
+            const custoCompletoPorKm = kmMensalTotal > 0 ? (custoTotalMes / kmMensalTotal) : 0;
+            const margemPorKm = receitaKm - custoCompletoPorKm;
+            const margemPct = faturamentoMes > 0 ? (lucroLiquidoMes / faturamentoMes) * 100 : 0;
+
+            // Break-even
+            const margemContribuicaoKm = receitaKm - custoVariavelMedioKm;
+            let breakEvenKm = 0;
+            let breakEvenDias = 0;
+            if (margemContribuicaoKm > 0) {
+                breakEvenKm = custoFixoTotalMes / margemContribuicaoKm;
+                breakEvenDias = kmDia > 0 ? (breakEvenKm / kmDia) : 0;
+            }
+
+            // Atualização dos Labels
+            document.getElementById('val-km-dia').textContent = `${kmDia} km/dia`;
+            document.getElementById('label-limite-bat').textContent = `${autonomiaEletrica} km`;
+            document.getElementById('span-bat-limit').textContent = autonomiaEletrica;
+            document.getElementById('badge-km-mes').textContent = `${kmMensalTotal.toLocaleString('pt-BR')} km/mês`;
+
+            document.getElementById('val-dias').textContent = `${dias} dias`;
+            document.getElementById('val-receita-km').textContent = `${formatBRL(receitaKm)}/km`;
+
+            document.getElementById('val-parcela').textContent = formatBRL(parcela);
+            document.getElementById('val-seguro').textContent = `${formatBRL(seguroAnual)}/ano`;
+            document.getElementById('val-seguro-mes').textContent = `${formatBRL(seguroMes)}/mês`;
+            document.getElementById('val-reserva').textContent = formatBRL(reservaMes);
+            document.getElementById('val-reserva-ano').textContent = formatBRL(reservaMes * 12);
+            document.getElementById('badge-fixo-total').textContent = `${formatBRL(custoFixoTotalMes)}/mês`;
+
+            document.getElementById('val-kwh').textContent = `${formatBRL(precoKwh)}/kWh`;
+            document.getElementById('val-autonomia').textContent = `${autonomiaEletrica} km`;
+            document.getElementById('val-gasolina').textContent = `${formatBRL(precoGasolina)}/L`;
+            document.getElementById('val-kml').textContent = `${eficienciaKml.toFixed(1).replace('.', ',')} km/L`;
+            document.getElementById('val-custo-gas-km').textContent = `${formatBRL(custoKmGasolina)}/km`;
+
+            document.getElementById('val-pneus').textContent = `${formatBRL(jogoPneus)} (${formatBRL3(custoKmPneus)}/km)`;
+
+            // Status REEV
+            const reevBox = document.getElementById('reev-status-box');
+            const reevIcon = document.getElementById('reev-icon');
+            const reevTitle = document.getElementById('reev-title');
+            const reevDesc = document.getElementById('reev-desc');
+
+            if (kmGasolinaDia === 0) {
+                reevBox.className = "rounded-xl p-3.5 bg-emerald-950/30 border border-emerald-800/40 flex items-start gap-3 transition-colors";
+                reevIcon.className = "ph-fill ph-battery-charging text-emerald-400 text-xl mt-0.5";
+                reevTitle.className = "font-bold text-emerald-300";
+                reevTitle.textContent = "Operação 100% Elétrica no Dia";
+                reevDesc.innerHTML = `Você está rodando <strong>${kmDia} km/dia</strong> na bateria (${formatBRL(custoKmEletrico)}/km) sem precisar acionar o gerador a gasolina.`;
+            } else {
+                reevBox.className = "rounded-xl p-3.5 bg-amber-950/30 border border-amber-700/50 flex items-start gap-3 transition-colors";
+                reevIcon.className = "ph-fill ph-gas-pump text-amber-400 text-xl mt-0.5";
+                reevTitle.className = "font-bold text-amber-300";
+                reevTitle.textContent = `Modo Extensor Ativado (+${kmGasolinaDia} km/dia na gasolina)`;
+                reevDesc.innerHTML = `Os primeiros <strong>${kmEletricoDia} km</strong> rodam na bateria (${formatBRL(custoKmEletrico)}/km) e os <strong>${kmGasolinaDia} km</strong> extras usam o gerador a gasolina (${formatBRL(custoKmGasolina)}/km).`;
+            }
+
+            // KPIs
+            const kpiLucroEl = document.getElementById('kpi-lucro');
+            kpiLucroEl.textContent = formatBRL(lucroLiquidoMes);
+            kpiLucroEl.className = `text-xl sm:text-2xl font-extrabold tracking-tight ${lucroLiquidoMes >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+            document.getElementById('kpi-lucro-dia').textContent = `${formatBRL(lucroPorDia)} / dia trabalhado`;
+
+            document.getElementById('kpi-custo-km').textContent = formatBRL(custoCompletoPorKm);
+            document.getElementById('kpi-variavel-km').textContent = `Variável: ${formatBRL(custoVariavelMedioKm)}/km`;
+
+            const kpiMargemEl = document.getElementById('kpi-margem-km');
+            kpiMargemEl.textContent = formatBRL(margemPorKm);
+            kpiMargemEl.className = `text-xl sm:text-2xl font-extrabold tracking-tight ${margemPorKm >= 0 ? 'text-teal-300' : 'text-rose-400'}`;
+            document.getElementById('kpi-margem-pct').textContent = `${margemPct.toFixed(1).replace('.', ',')}% da receita bruta`;
+
+            if (margemContribuicaoKm > 0) {
+                document.getElementById('kpi-breakeven-km').textContent = `${Math.ceil(breakEvenKm).toLocaleString('pt-BR')} km`;
+                document.getElementById('kpi-breakeven-dias').textContent = `~${breakEvenDias.toFixed(1).replace('.', ',')} dias p/ pagar tudo`;
+            } else {
+                document.getElementById('kpi-breakeven-km').textContent = "Inviável";
+                document.getElementById('kpi-breakeven-dias').textContent = "Receita/km menor que custo var.";
+            }
+
+            // Barra Proporcional
+            document.getElementById('bar-faturamento-total').textContent = formatBRL(faturamentoMes);
+            if (faturamentoMes > 0) {
+                const fixoSemReserva = parcela + seguroMes;
+                const pFixo = Math.min(100, (fixoSemReserva / faturamentoMes) * 100);
+                const pReserva = Math.min(100 - pFixo, (reservaMes / faturamentoMes) * 100);
+                const pVar = Math.min(100 - pFixo - pReserva, (custoVariavelTotalMes / faturamentoMes) * 100);
+                const pLucro = Math.max(0, 100 - pFixo - pReserva - pVar);
+
+                document.getElementById('pct-fixo').textContent = `${pFixo.toFixed(1)}%`;
+                document.getElementById('pct-reserva').textContent = `${pReserva.toFixed(1)}%`;
+                document.getElementById('pct-var').textContent = `${pVar.toFixed(1)}%`;
+                document.getElementById('pct-lucro').textContent = `${pLucro.toFixed(1)}%`;
+
+                document.getElementById('prog-fixo').style.width = `${pFixo}%`;
+                document.getElementById('prog-reserva').style.width = `${pReserva}%`;
+                document.getElementById('prog-var').style.width = `${pVar}%`;
+                document.getElementById('prog-lucro').style.width = `${pLucro}%`;
+            }
+
+            // Demonstrativo Lateral
+            document.getElementById('resumo-km-total').textContent = `${kmMensalTotal.toLocaleString('pt-BR')} km/mês`;
+            document.getElementById('detalhe-faturamento-diario').textContent = `${formatBRL(faturamentoDia)}/dia × ${dias} dias`;
+            document.getElementById('ext-faturamento').textContent = formatBRL(faturamentoMes);
+
+            document.getElementById('ext-total-fixo').textContent = formatBRL(custoFixoTotalMes);
+            document.getElementById('ext-parcela').textContent = formatBRL(parcela);
+            document.getElementById('ext-seguro').textContent = formatBRL(seguroMes);
+            document.getElementById('ext-reserva').textContent = formatBRL(reservaMes);
+            document.getElementById('ext-fixo-por-km').textContent = `${formatBRL(custoFixoPorKm)}/km`;
+
+            document.getElementById('ext-total-variavel').textContent = formatBRL(custoVariavelTotalMes);
+            document.getElementById('ext-km-eletrico-info').textContent = `${kmEletricoMes.toLocaleString('pt-BR')} km (${formatBRL3(custoKmEletrico)}/km)`;
+            document.getElementById('ext-energia').textContent = formatBRL(gastoEnergiaMes);
+
+            document.getElementById('ext-km-gas-info').textContent = kmGasolinaMes > 0 
+                ? `${kmGasolinaMes.toLocaleString('pt-BR')} km (${formatBRL3(custoKmGasolina)}/km)` 
+                : `0 km/mês (não utilizado)`;
+            document.getElementById('ext-gasolina').textContent = formatBRL(gastoGasolinaMes);
+
+            document.getElementById('ext-pneu-km').textContent = formatBRL3(custoKmPneus);
+            document.getElementById('ext-pneus').textContent = formatBRL(gastoPneusMes);
+
+            document.getElementById('ext-rev-km').textContent = formatBRL3(custoKmRevisao);
+            document.getElementById('ext-revisoes').textContent = formatBRL(gastoRevisaoMes);
+            document.getElementById('ext-var-por-km').textContent = `${formatBRL(custoVariavelMedioKm)}/km`;
+
+            document.getElementById('ext-custo-total').textContent = formatBRL(custoTotalMes);
+
+            const boxFinal = document.getElementById('box-resultado-final');
+            const extLucroFinal = document.getElementById('ext-lucro-final');
+            extLucroFinal.textContent = formatBRL(lucroLiquidoMes);
+
+            if (lucroLiquidoMes >= 0) {
+                boxFinal.className = "rounded-2xl p-4 bg-gradient-to-r from-emerald-600/20 to-teal-600/20 border border-emerald-500/40 space-y-2";
+                extLucroFinal.className = "text-2xl font-black text-emerald-400";
+            } else {
+                boxFinal.className = "rounded-2xl p-4 bg-gradient-to-r from-rose-600/20 to-red-600/20 border border-rose-500/40 space-y-2";
+                extLucroFinal.className = "text-2xl font-black text-rose-400";
+            }
+
+            document.getElementById('ext-lucro-mais-reserva').textContent = formatBRL(lucroLiquidoMes + reservaMes);
+        }
+
+        function resetDefaults() {
+            Object.keys(defaults).forEach(key => {
+                if (sliders[key]) {
+                    sliders[key].value = defaults[key];
+                }
+            });
+            calculate();
+            showToast("Valores originais restaurados!");
+        }
+
+        function copySummary() {
+            const kmDia = sliders.kmDia.value;
+            const dias = sliders.dias.value;
+            const kmMes = kmDia * dias;
+            const fat = document.getElementById('ext-faturamento').textContent;
+            const fixo = document.getElementById('ext-total-fixo').textContent;
+            const varTotal = document.getElementById('ext-total-variavel').textContent;
+            const custoKm = document.getElementById('kpi-custo-km').textContent;
+            const lucro = document.getElementById('ext-lucro-final').textContent;
+            const reserva = document.getElementById('ext-reserva').textContent;
+
+            const text = `SIMULAÇÃO LEAPMOTOR C10 REEV (UBER BLACK)\n` +
+                         `• Rodagem: ${kmDia} km/dia × ${dias} dias = ${kmMes.toLocaleString('pt-BR')} km/mês\n` +
+                         `• Faturamento Bruto: ${fat}\n` +
+                         `• Custos Fixos + Reserva: ${fixo} (inclui ${reserva} de reserva)\n` +
+                         `• Custos Variáveis: ${varTotal}\n` +
+                         `• Custo Completo/km: ${custoKm}\n` +
+                         `• Lucro Líquido Livre: ${lucro}`;
+
+            const tempInput = document.createElement("textarea");
+            tempInput.value = text;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand("copy");
+            document.body.removeChild(tempInput);
+
+            showToast("Resumo da simulação copiado!");
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-msg').textContent = msg;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 2800);
+        }
+
+        Object.values(sliders).forEach(slider => {
+            slider.addEventListener('input', calculate);
+        });
+
+        window.addEventListener('DOMContentLoaded', calculate);
+    </script>
+</body>
+</html>
